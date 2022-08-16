@@ -1,44 +1,91 @@
 <div class="container">
-  <div class="col">
+  <div class="row">
     <h1>Welcome!</h1>
     <hr>
     <!-- dropdown menu -->
-    <div ngbDropdown class="d-inline-block">
-      <button class="btn btn-outline-primary" ngbDropdownToggle>Select user</button>
-      <div ngbDropdownMenu>
-        <button class="dropdown-item" *ngFor="let user of users" (click)="onSelectedUserName(user.user_name)">{{ user.user_name }}</button>
+    <div class="row">
+      <div class="col-2">
+        <div ngbDropdown class="d-inline-block mb-3">
+          <button class="btn btn-outline-primary" ngbDropdownToggle>Select user</button>
+          <div ngbDropdownMenu>
+            <button class="dropdown-item" *ngFor="let user of users" (click)="onSelectedUserName(user.user_name)">{{ user.user_name }}</button>
+          </div>
+        </div>
+        <p *ngIf="selectedUserName !== ''">Displaying information for {{ selectedUserName }}</p>
+      </div>
+      <div class="col-2">
+        <form (ngSubmit)="onSubmit(f)" #f="ngForm" class="mb-2">
+          <div class="form-group">
+            <label for="interval">Set interval:</label>
+            <input type="text" id="interval" class="form-control" name="interval" ngModel required>
+          </div>
+          <div class="form-group">
+            <label for="fastest_interval">Set fastest interval:</label>
+            <input type="text" id="fastest_interval" class="form-control" name="fastest_interval" ngModel required>
+          </div>
+          <button type="submit" class="btn btn-info mt-3" [disabled]="!f.valid">Send settings</button>
+        </form>
+      </div>
+      <div class="col-2">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch" id="flexSwitchCheckDefault" (change)="onChangedStartService($event)">
+          <label class="form-check-label" for="flexSwitchCheckDefault">Start android service</label>
+        </div>
       </div>
     </div>
-    <p *ngIf="selectedUserName !== ''">Displaying coordinates for {{ selectedUserName }}</p>
     
-    <!-- insert input text here -->
-    <!-- <form (ngSubmit)="onSubmit()" #f="ngForm">
-      <div class="form-group">
-        <label for="username">Enter the user name:</label>
-        <input type="text" id="username" class="form-control" name="username" ngModel required>
-      </div>
-      <button type="submit" class="btn btn-info mt-3">Get coordinates</button>
-    </form> -->
-    <hr>
     
     <!-- insert google map here -->
-    <google-map height="500px" width="100%" [center]="center" [zoom]="zoom">
-      <div *ngIf="showAllCoordinates && !noData">
+    <google-map height="500px" width="100%" [center]="center" [zoom]="zoom" id="map" #map>
+      <div *ngIf="(showAllCoordinates || showAllCoordinatesAfter) && !noData">
         <map-marker *ngFor="let marker of markers" [position]="marker.position"></map-marker>
+        <map-polyline [options]="polylineOptions"></map-polyline>
       </div>
       <div *ngIf="showLastCoordinates && !noData">
         <map-marker [position]="lastLocation.position" icon="http://maps.google.com/mapfiles/ms/icons/blue-dot.png"></map-marker>
       </div>
+      <div *ngIf="showLiveUpdates">
+        <map-marker *ngFor="let liveMarker of liveMarkers" [position]="liveMarker.position"></map-marker>
+      </div>
     </google-map>
     <div class="mt-3">
-      <button type="button" class="btn btn-outline-primary" style="margin-right: 10px;" (click)="onShowLastLocation()">Show last coordinates pin</button>
-      <button type="button" class="btn btn-outline-warning" style="margin-right: 10px;" (click)="onRemoveLastLocation()">Remove last coordinates pin</button>
-      <button class="btn btn-outline-secondary" style="margin-right: 10px;" (click)="onShowAllLocations()">Show all coordinates</button>
-      <button class="btn btn-outline-warning" style="margin-right: 10px;" (click)="onRemoveAllLocations()">Remove all coordinates</button>
-      <button class="btn btn-outline-danger" style="margin-right: 10px;" (click)="onClearMap()">Clear map</button>
+      <div class="row">
+        <div class="col-3">
+          <button type="button" class="btn btn-outline-primary" style="margin-right: 10px;" (click)="onShowLastLocation()">Show last coordinates pin</button>
+        </div>
+        <div class="col-3">
+          <button type="button" class="btn btn-outline-warning" style="margin-right: 10px;" (click)="onRemoveLastLocation()">Remove last coordinates pin</button>
+        </div>
+        <div class="col-3">
+          <button class="btn btn-outline-secondary" style="margin-right: 10px;" (click)="onShowAllLocations()">Show all coordinates</button>
+        </div>
+        <div class="col-3">
+          <button class="btn btn-outline-warning" style="margin-right: 10px;" (click)="onRemoveAllLocations()">Remove all coordinates</button>
+        </div>
+      </div>
+      <div class="row mt-3">
+        <div class="col-3">
+          <button class="btn btn-outline-info" style="margin-right: 10px;" (click)="onShowCoordinatesAfterDate()">Show coordinates after a date</button>
+        </div>
+        <div class="col-3">
+          <button class="btn btn-outline-success" style="margin-right: 10px;" (click)="onShowLiveUpdates()">Show live updates</button>
+        </div>
+        <div class="col-3">
+          <button class="btn btn-outline-danger" style="margin-right: 10px;" (click)="onRemoveLiveUpdates()">Stop live updates</button>
+        </div>
+        <div class="col-3">
+          <button class="btn btn-outline-danger" style="margin-right: 10px;" (click)="onClearMap()">Clear map</button>
+        </div>
+      </div>
     </div>
+    <mat-form-field *ngIf="showDatePicker">
+      <mat-label>Choose a date</mat-label>
+      <input matInput type="datetime-local" (change)="onSelectedDate($event)">
+    </mat-form-field>
     <div class="mt-3">
       <h4 *ngIf="noData">You must fetch the data first!!</h4>
+      <h4 *ngIf="noAvailableData">No available data for {{ selectedUserName }}</h4>
+      <h4 *ngIf="noUsernameSelected">You must select an username first</h4>
     </div>
   </div>
 </div>
