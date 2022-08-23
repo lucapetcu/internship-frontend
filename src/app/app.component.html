@@ -17,7 +17,7 @@
           <button class="btn btn-outline-danger" (click)="onStopTracking()" style="margin-bottom: 10px;">Stop tracking {{ selectedUserName }}</button>
         </div>
       </div>
-      <div class="col-2">
+      <div class="col-2" *ngIf="selectedUserName !== ''">
         <form (ngSubmit)="onSubmit(f)" #f="ngForm" class="mb-2">
           <div class="form-group">
             <label for="interval">Set interval:</label>

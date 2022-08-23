@@ -169,11 +169,113 @@ export class AppComponent implements OnInit{
       });
   }
 
+  rayCastIntersect(tap: Marker, vertA: Marker, vertB: Marker): boolean {
+    var aY = vertA.position.lat;
+    var bY = vertB.position.lat;
+    var aX = vertA.position.lng;
+    var bX = vertA.position.lng;
+    var pY = tap.position.lat;
+    var pX = tap.position.lng;
+
+    if ((aY > pY && bY > pY) || (aY < pY && bY < pY) || (aX < pX && bX < pX)) {
+      return false; 
+    }
+    var m = (aY - bY) / (aX - bX);
+    var bee = (-aX) * m + aY;
+    var x = (pY - bee) / m;
+    return x > pX;
+  }
+
+  isPointInPolygon(tap: Marker, vertices: Marker[]): boolean {
+    var intersectCount = 0;
+    for (let j = 0; j < vertices.length - 1; j++) {
+      if (this.rayCastIntersect(tap, vertices[j], vertices[j + 1])) {
+        intersectCount++;
+      }
+    }
+    console.log(`intersect count ${intersectCount}`, (intersectCount % 2) === 1);
+    return (intersectCount % 2) === 1;
+  }
+
+  onSegment(p: Marker, q: Marker, r: Marker): boolean {
+    if (q.position.lng <= Math.max(p.position.lng, r.position.lng) 
+        && q.position.lng >= Math.min(p.position.lng, r.position.lng) 
+        && q.position.lat <= Math.max(p.position.lat, r.position.lat) 
+        && q.position.lat >= Math.min(p.position.lat, r.position.lat)) {
+      return true;
+    }
+    return false;
+  }
+
+  orientation(p: Marker, q: Marker, r: Marker): number {
+    let val = (q.position.lat - p.position.lat) * (r.position.lng - q.position.lng) 
+      - (q.position.lng - p.position.lng) * (r.position.lat - q.position.lat);
+    if (val == 0) {
+      return 0;
+    }
+    return (val > 0) ? 1 : 2;
+  }
+
+  doIntersect(p1: Marker, q1: Marker, p2: Marker, q2: Marker): boolean {
+    let o1 = this.orientation(p1, q1, p2);
+    let o2 = this.orientation(p1, q1, q2);
+    let o3 = this.orientation(p2, q2, p1);
+    let o4 = this.orientation(p2, q2, q1);
+
+    if (o1 != o2 && o3 != o4) {
+      return true;
+    }
+
+    if (o1 == 0 && this.onSegment(p1, p2, q1)) {
+      return true;
+    }
+
+    if (o2 == 0 && this.onSegment(p1, q2, q1)) {
+      return true;
+    }
+
+    if (o3 == 0 && this.onSegment(p2, p1, q2)) {
+      return true;
+    }
+
+    if (o4 == 0 && this.onSegment(p2, q1, q2)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  isInside(polygon: Marker[], p: Marker): boolean {  
+    let extreme = {
+      position: {
+        lat: p.position.lat,
+        lng: 10000
+      }
+    }
+    let count = 0, i = 0;
+    do
+    {
+      let next = (i + 1) % polygon.length;
+  
+      if (this.doIntersect(polygon[i], polygon[next], p, extreme)) {
+        if (this.orientation(polygon[i], p, polygon[next]) == 0) {
+          return this.onSegment(polygon[i], p, polygon[next]);
+        }
+  
+        count++;
+      }
+
+      i = next;
+    } while (i != 0);
+  
+    return (count % 2 == 1);
+  }
 
   onShowLiveUpdates() {
     this.showLastCoordinates = false;
     this.showAllCoordinates = false;
-    this.liveMarkers.splice(0, this.liveMarkers.length);
+    this.liveMarkers.splice(0);
+    console.log(this.liveMarkers.length);
     if (this.selectedUserName === '') {
       this.noUsernameSelected = true;
       alert('You must select an username first!');
@@ -182,41 +284,37 @@ export class AppComponent implements OnInit{
         this.http
           .get<CoordResponse>('http://127.0.0.1:3000/coordinates/get-last-coordinates/' + this.selectedUserName)
           .subscribe(resData => {
-            // console.log(resData);
             if (resData.locations.length === 0) {
               this.noAvailableData = true;
             } else {
-              if (this.liveMarkers.length > 0 && this.liveMarkers[this.liveMarkers.length - 1] !== {position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}}) {
+              if (this.liveMarkers.length > 0 && JSON.stringify(this.liveMarkers[this.liveMarkers.length - 1])  !== JSON.stringify({position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}})) {
                 this.liveMarkers.push({
                   position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}
                 });
                 if (this.trackUser) {
-                  const path = [];
-                  for (let i = 0; i < this.geofenceMarkers.length; i++) {
-                    path.push({
-                      lat: this.geofenceMarkers[i].position.lat,
-                      lng: this.geofenceMarkers[i].position.lng
-                    });
+                  // if (!this.isPointInPolygon({
+                  //   position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}
+                  // }, this.geofenceMarkers)) {
+                  //   alert(`${this.selectedUserName} has left the designated area 1`);
+                  // }
+                  if (!this.isInside(this.geofenceMarkers, {position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}})) {
+                    alert(`${this.selectedUserName} has left the designated area 1`);
                   }
-                  const polygon = new google.maps.Polygon({paths: path});
-                  const result = google.maps.geometry.poly.containsLocation(new google.maps.LatLng(resData.locations[0].latitude, resData.locations[0].longitude), polygon);
-                  console.log(result);
                 }
-              } else if (this,this.liveMarkers.length === 0) {
+              } else if (this.liveMarkers.length === 0) {
                 this.liveMarkers.push({
                   position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}
                 });
+                console.log('len = 0');
                 if (this.trackUser) {
-                  const path = [];
-                  for (let i = 0; i < this.geofenceMarkers.length; i++) {
-                    path.push({
-                      lat: this.geofenceMarkers[i].position.lat,
-                      lng: this.geofenceMarkers[i].position.lng
-                    });
+                  // if (!this.isPointInPolygon({
+                  //   position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}
+                  // }, this.geofenceMarkers)) {
+                  //   alert(`${this.selectedUserName} has left the designated area 2`);
+                  // }
+                  if (!this.isInside(this.geofenceMarkers, {position: {lat: resData.locations[0].latitude, lng: resData.locations[0].longitude}})) {
+                    alert(`${this.selectedUserName} has left the designated area 2`);
                   }
-                  const polygon = new google.maps.Polygon({paths: path});
-                  const result = google.maps.geometry.poly.containsLocation(new google.maps.LatLng(resData.locations[0].latitude, resData.locations[0].longitude), polygon);
-                  console.log(result);
                 }
               }
               this.showLiveUpdates = true;
@@ -270,9 +368,9 @@ export class AppComponent implements OnInit{
 
   onStartTracking() {
     if (this.geofenceMarkers.length === 0) {
-      alert('You must select at least 3 points on the map, then click again to start tracking');
+      alert('You must select at least 4 points on the map, then click again to start tracking');
     } else if (!this.showLiveUpdates){
-      alert('You must enable live updates for the userm then click again to start tracking');
+      alert('You must enable live updates for the user, then click again to start tracking');
     } else {
       this.trackUser = true;
     }
